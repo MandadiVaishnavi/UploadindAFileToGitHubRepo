@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Browser</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        ul { list-style-type: none; }
+        li { margin: 5px 0; }
+        .directory { cursor: pointer; color: blue; }
+        .file { color: gray; }
+    </style>
+</head>
+<body>
+    <h1>File Browser</h1>
+    <div>
+        <h2>Directories</h2>
+        <ul id="file-list"></ul>
+    </div>
+    <h2>Upload File</h2>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <input type="hidden" id="upload-path" name="path" value="">
+        <button type="submit">Upload</button>
+    </form>
+
+    <script>
+        const fileList = document.getElementById('file-list');
+        const uploadForm = document.getElementById('upload-form');
+        const uploadPathInput = document.getElementById('upload-path');
+
+        async function fetchDirectoryContents(directoryPath = '') {
+            console.log('Fetching directory:', directoryPath);
+            const response = await fetch(`http://localhost:3000/api/contents?path=${encodeURIComponent(directoryPath)}`);
+            
+            if (response.ok) {
+                const contents = await response.json();
+                renderFileList(contents);
+            } else {
+                console.error('Failed to fetch directory contents:', await response.text());
+            }
+        }
+
+        function renderFileList(contents) {
+            fileList.innerHTML = '';
+            contents.forEach(item => {
+                const listItem = document.createElement('li');
+                if (item.type === 'dir') {
+                    listItem.className = 'directory';
+                    listItem.textContent = item.name;
+                    listItem.onclick = () => {
+                        console.log('Clicked directory:', item.name);
+                        const currentPath = uploadPathInput.value ? `${uploadPathInput.value}/${item.name}` : item.name;
+                        fetchDirectoryContents(currentPath);
+                        updateUploadPath(currentPath);
+                    };
+                } else {
+                    listItem.className = 'file';
+                    listItem.textContent = item.name;
+                }
+                fileList.appendChild(listItem);
+            });
+        }
+
+        function updateUploadPath(newPath) {
+            uploadPathInput.value = newPath;
+            console.log('Updated upload path:', uploadPathInput.value);
+        }
+
+        uploadForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(uploadForm);
+
+            await fetch('http://localhost:3000/api/upload', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Upload failed: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('File uploaded successfully');
+            })
+            .catch(error => {
+                console.error('Error during file upload:', error);
+                alert('File upload failed: ' + error.message);
+            });
+        };
+
+        // Initial fetch
+        fetchDirectoryContents();
+    </script>
+</body>
+</html>
